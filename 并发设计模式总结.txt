@@ -1,0 +1,52 @@
+1.Thread-Per-Message模式：收到一条请求，就启动一个线程去处理。例如可以Socket通信接收端，收到一条请求后，就启动一个线程去处理。一般会使用线程池，或者协程（轻量级线程）例如大名顶顶的goroutine
+
+2.Immutability模式：利用final的不可变性保证线程安全。一般这样的类，类和属性都是final的，且属性只读。
+比如我们常用的String。有人会问，String不是可以重新赋值改变吗？实际上看String的源码可以知道改变String的值实际上是返回了一个新的对象。所以在字符串经常变化的场景建议使用StringBuilder和StringBuffer(线程安全)
+
+３.享元模式：本质上就是一个对象池，在创建之前，看看池子里是否存在该对象，如果已经存在，则直接取用，如果不存在，就新建一个对象，并把对象放到池子里。比如常用的Long，Long内部就维护了一个对象池，缓存了[-128,127]之间的数，这个对象池再JVM创建时就创建好了，而且是静态的，不会有变化。于是使用Long时[-128,127]之间的数字就可以直接取用，效率就高了。
+
+４．Ｃopy-on-Write设计模式。只有真是需要复制的时候才复制，而不是一开始就复制好。比如Docker容器镜像设计的就是Ｃopy-on-Write, 比如Linux操作系统中的fork()出子进程时，并不复制整个进程的地址空间，而是父子共享一个地址空间，只有当父进程或者子进程需要写入的时候才会复制地址空间，让父子拥有各自的地址空间。
+Java中的CopyOnWriteArrayList和CopyOnWriteArraySet这两个容器在修改的时候会复制整个数组，所以通常不建议使用。反之，读多写少，且数组量不大，但是对性能要求严苛的场景，使用它们的效果就很好了。
+
+５．ThreadLocal设计模式。让每个线程拥有自己的本地变量，线程之间不共享，也就避免了多线程问题。
+Java的设计是，Thread里面有一个ThreadLocalMap（ThreadLocals），这个ThreadLocalMap的Key是ThreadLocal，value就是变量值.
+为什么不是创建一个Map,　key是Thread, value是每个线程拥有的变量，然后每个线程的ThreadLocal持有一个这样的Map?
+原因是：1). ThreadLocal仅仅是一个代理工具类，并不持有持有任何与线程相关的数据。
+　　　　2). Java SDK中的做法不容易产生内存泄露。ThreadLocalMap对ThreadLocal是弱引用，只要Thread对象可以被回收，那么ThreadLocalMap就能被回收，更加安全。如果是ThreadLocal持有一个Map,Map中又有Thread的引用，那么由于ThreadLocal的生命周期往往比Thread要长，就容易造成内存泄露。
+注意事项：１）线程池中使用ThreadLocal容易造成内存泄露(因为线程池里的线程用完后就放着，导致其持有的ThreadLocalMap不会被回收)，一般不建议使用，如果要使用一定要在finally中移除：
+ExecutorService es;
+ThreadLocal tl;
+es.execute(()->{
+  //ThreadLocal 增加变量
+  tl.set(obj);
+  try {
+    // 省略业务逻辑代码
+  }finally {
+    // 手动清理 ThreadLocal 
+    tl.remove();
+  }
+});
+２）.ThreadLocal创建的线程变量是不能被子线程继承的，如果要被继承，就要使用InheritableThreadLocal
+
+6.GuardedSuspension模式
+一个线程阻塞，直到某个条件满足后线程被唤醒继续处理。比如前面例子的LockAndCondition就是使用了GuardSuspension模式。
+
+7.生产消费者模式
+
+8.Work-Thread模式
+工厂里有8个工人，谁空闲就谁来干活。线程池设计也就是使用了这个模式，空闲的线程去执行任务，执行完成后又放回线程池中，供下一个任务使用。
+
+9.两阶段终止模式
+Java中终止一个线程已经不建议使用stop()方法，原因是stop方法一剑封喉，没有机会给线程料理后事。
+建议使用的是interrupt()方法。
+一个线程终止，就变成了：a.执行interrupt()方法　b.线程终止标识位
+interrupt()方法可以使线程回到Runnnable状态，继续执行run方法。然后设置一个标识位，线程检查标识位符合终止条件时优雅的退出。详见TwoStagesStopPattern.java
+另外，线程池提供了shutdown()和shutdownNow()方法来终止线程池。
+shutdown()会拒绝接受新的任务，等正在执行的任务，以及队列中的任务执行完后才会关闭线程池
+shutdownNow()不仅拒绝新的任务，阻塞队列中的任务也会被剥夺执行机会，也会中断正在执行的线程。
+这两个方法其实也是利用了两阶段终止模式。
+
+10. Balking模式
+线程安全的单例模式。
+
+

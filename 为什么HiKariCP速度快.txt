@@ -1,0 +1,27 @@
+1. 数据库链接池和线程池一样都属于池化资源，作用是为了避免质量级资源重复的创建和销毁。对于数据库链接池来说，就是为了避免数据库链接的创建和销毁：当需要操作数据库时，就从链接池子中去拿一个链接，用完后再放回池子里面即可。目前，SpringBoot2.x已经将内置的数据源改为HiKariCP，就是因为它快。
+
+２．执行数据库操作的基本步骤：
+１）获取一个数据库链接
+２）创建Statement
+３) 执行SQL
+４）释放ResultSet,Statement,数据库Connection
+详细可见HiKariCPDemo
+
+３. HiKariCP 快的原因
+1) 使用FastList带了原生的ArrayList
+执行完数据库操作后，需要关闭ResultSet,Statement和Connection. 为了方便，将ReesultSet和Statement保存在ArrayList中，在关闭Connection时，将它们一起关闭即可。可是ArrayList还是太慢，都知道ArrayList在删除时的效率比较低，可以做优化。
+FaskList就是使用逆序remove的方法来加快删除速度。比如一个Connection有A,B,C,D,E,F　６个Statement，那么按照正常编码习惯，关闭Statement一般是F,E,D,C,B,A是逆序的，所以HiKariCP再删除时也是逆序的，这样就提高了效率。　另外FastList的get方法保证不会越界，减少了判定越界的消耗。
+
+２）使用ConcurrentBag代替Java SDK中的BlockingQueue
+其关键属性
+// 用于存储所有的数据库连接
+CopyOnWriteArrayList<T> sharedList;
+// 线程本地存储中的数据库连接
+ThreadLocal<List<Object>> threadList;
+// 等待数据库连接的线程数
+AtomicInteger waiters;
+// 分配数据库连接的工具，SunchronousQueue主要用于线程之间传递数据
+SynchronousQueue<T> handoffQueue;
+当有线程创建数据库连接时，就会通过add方法将链接加入到sharedList中。如果此时有线程等待数据库链接，就通过handoffQueue将连接分配给等待的线程。
+通过borrow方法可以获取一个空闲链接，首先看threadList中是否有空闲连接，有的话就从里面取出，没有的话就从sharedList中取，如果sharedList中也没有，就等待。
+ConcurrentBag通过ThreadLocal做一次资源的预分配，避免直接池化资源的竞争，从而提升了性能。

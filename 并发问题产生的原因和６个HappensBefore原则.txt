@@ -1,0 +1,67 @@
+１．并发问题产生的原因
+CPU速度 >> 内存速度　>> IO速度
+CPU存在缓存以平衡和内存之间的速度，而编译器也会优化指令的执行次序，使得缓存更合理的利用。
+硬件的发展，出现了多核（多进程），多进程的CPU来提升性能。
+但是硬件的这些优化也给程序带来了并发问题
+以count += 1语句来说，
+a.首先要将count从内存加载到cpu寄存器，
+b.执行寄存器执行＋１操作
+c.最后将结果写入内存（但CPU缓存机制可能是写入到CPU缓存而不是内存）。
+如果两个不同CPU的线程同时都对一个共享变量count进行+1操作，那么可能读到是各自CPU结果的缓存，本来总的应该加了２，实际只加了１．　
+如果是同一CPU的两个线程，由于线程存在切换，也有可能出现类似的问题，执行完步骤b时得到１（还没有写入内存），最后只加了１．
+另外，编译器优化也会带来并发问题，以未考虑多线程的单例模式为例：
+public class Singleton {
+  static Singleton instance;
+  static Singleton getInstance(){
+    if (instance == null) {
+      synchronized(Singleton.class) {
+        if (instance == null)
+          instance = new Singleton();
+        }
+    }
+    return instance;
+  }
+}
+实际上述单例模式中new语句经过编译器优化后的执行顺序是：a.申请一块内存M->b赋值给instance->c初始化instance。三个步骤各自是原子的，但是abc一起就不是原子的了。多线程时，可能存在线程１只是执行完了b发生了线程切换，但是线程２发现instace已经不为null了，这时直接返回instance，于是线程２在使用instance的成员变量时就可能发生空指针异常。
+
+
+总之，并发问题产生的原因就是CPU存在缓存，线程存在切换，编译器也会优化语句顺序。
+
+２．什么是可见性
+就是说一个线程对共享变量的修改，另一个线程能立刻看到。
+
+３．volatile的语义
+volatile int x = 0意思是x这个变量不能使用cpu缓存，必须从内存中读写
+
+4.　6个HappensBefore原则
+以如下代码为例
+// 【参考 1】
+class VolatileExample {
+  int x = 0;
+  volatile boolean v = false;
+  public void writer() {
+    x = 42;
+    v = true;
+  }
+  public void reader() {
+    if (v == true) {
+      // 这里 x 会是多少呢？
+    }
+  }
+}
+原则１：x=42 happens before与x=true，即到x=42对于到v=true时是可见的，即程序顺序原则
+原则２：volatile变量v的写操作v=true，对于其后续的读操作if (v == true)是可见的。
+原则３：传递性。A对B可见，B对C可见，则A对C可见。比如x=42就对v==true那里可见
+
+//【参考２】
+synchronized (this) { // 此处自动加锁
+  // x 是共享变量, 初始值 =10
+  if (this.x < 12) {
+    this.x = 12; 
+  }  
+} // 此处自动解锁
+原则４：锁规则。本次的解锁对下一次的加锁是可见的
+
+原则５：线程启动原则。　A线程中启动B线程，则A中调用B线程的start方法对于B线程的所有操作是可见的。
+
+原则６：线程join规则。B.join()就是要等待线程B执行完后继续执行后面的，所以这个原则是在说B.join()操作对于后续所有操作都是可见的。

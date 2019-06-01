@@ -1,0 +1,60 @@
+总之，并发编程的两大核心，１是同步，２是互斥。Java SDK中提供了Lock等手段来解决互斥问题，而使用Condition来解决同步问题。
+１．为什么不推荐使用synchronized
+synchronized在申请资源时如果申请不到就直接进入阻塞状态了，进入阻塞状态后线程就什么也不能做，只能等待了。好的锁应该满足a)能够响应中断　b)支持超市　c)非阻塞的获取锁三个条件。所以Java SDK才造了ReenTrantLock
+2. ReentrantLock锁的经典写法
+class X {
+  private final Lock rtl =
+  new ReentrantLock();
+  int value;
+  public void addOne() {
+    // 获取锁
+    rtl.lock();  
+    try {
+      value+=1;
+    } finally {
+      // 保证锁能释放
+      rtl.unlock();
+    }
+  }
+}
+ReenTrantLock利用了volatile的可见性原则。　内部有一个volatile的state变量，获取锁时，读写state变量；释放锁是，也会读写state变量。这样：
+１）、前一个线程的unlock()操作一定对于后一个线程的lock()操作是可见的。
+２）、再根据顺序性原则，前一个线程的内的操作对于unlock()这个操作一定是可见的
+３）、再根据传递性原则，前一个线程内的操作对于后一个线程的lock()操作是可见的。
+ReenTrantLock还是可重入的（顾名思义），指的是线程可以重复获取同一把锁。
+ReeanTrantLock还有一个带fair参数的构造函数，true则表示是公平锁，否则是非公平锁。
+如果是公平锁，唤醒策略就是，等待的时间越长，谁就先被唤醒；否则，就是notifyAll的机制，大家公平竞争。
+３. 活锁的例子：
+class Account {
+  private int balance;
+  private final Lock lock
+          = new ReentrantLock();
+  // 转账
+  void transfer(Account tar, int amt){
+    while (true) {
+      if(this.lock.tryLock()) {
+        try {
+          if (tar.lock.tryLock()) {
+            try {
+              this.balance -= amt;
+              tar.balance += amt;
+            } finally {
+              tar.lock.unlock();
+            }
+          }//if
+        } finally {
+          this.lock.unlock();
+        }
+      }//if
+    }//while
+  }//transfer
+}
+由于ReenTrantLock是非阻塞了，破坏了死锁“不可抢占”的条件，这里不会造成死锁。但是可能出现A和Ｂ互相转账时，各自都持有自己的锁，又去获取对方的锁，造成“活锁”。
+另外要注意的是，ReenTrantLock里面要使用await(),signal(),signalAll()对应synchronized中的wait(),notify(),notifyAll()，不要弄混淆了。
+
+４．死锁和活锁的区别
+死锁：　A拿着B想要的锁阻塞着，B拿着A想要的锁阻塞着，互不让步。
+活锁：　A非阻塞的拿了锁1想要拿锁２，B非阻塞的拿了锁２想要拿锁１，结果每次AB都拿不全自己想要的锁。
+
+５. 造成死锁必须满足４个的条件
+互斥，占有且等待，不可抢战，循环等待。
