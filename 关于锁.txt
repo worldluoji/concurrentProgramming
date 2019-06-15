@@ -1,6 +1,6 @@
 总之，并发编程的两大核心，１是同步，２是互斥。Java SDK中提供了Lock等手段来解决互斥问题，而使用Condition来解决同步问题。
 １．为什么不推荐使用synchronized
-synchronized在申请资源时如果申请不到就直接进入阻塞状态了，进入阻塞状态后线程就什么也不能做，只能等待了。好的锁应该满足a)能够响应中断　b)支持超市　c)非阻塞的获取锁三个条件。所以Java SDK才造了ReenTrantLock
+synchronized在申请资源时如果申请不到就直接进入阻塞状态了，进入阻塞状态后线程就什么也不能做，只能等待了。好的锁应该满足a)能够响应中断　b)支持超时　c)非阻塞的获取锁三个条件。所以Java SDK才造了ReenTrantLock
 2. ReentrantLock锁的经典写法
 class X {
   private final Lock rtl =
