@@ -1,7 +1,14 @@
 总之，并发编程的两大核心，１是同步，２是互斥。Java SDK中提供了Lock等手段来解决互斥问题，而使用Condition来解决同步问题。
-１．为什么不推荐使用synchronized
+加锁能够保证执行临界区代码的互斥性。
+
+１．关于synchronized
 synchronized在申请资源时如果申请不到就直接进入阻塞状态了，进入阻塞状态后线程就什么也不能做，只能等待了。好的锁应该满足a)能够响应中断　b)支持超时　c)非阻塞的获取锁三个条件。所以Java SDK才造了ReenTrantLock
-2. ReentrantLock锁的经典写法
+不过这只是对低版本的JDK来说，高版本已经做了优化，可以放心使用。synchronized，又被称为管程。
+
+2. ReentrantLock锁
+ReentrantLock是基于AQS实现的互斥锁，AQS是Java并发包中众多同步组件的构建基础。
+相比原生的Synchronized，ReentrantLock增加了一些高级的扩展功能，比如它可以实现公平锁，同时也可以绑定多个Conditon。
+经典写法：
 class X {
   private final Lock rtl =
   new ReentrantLock();
@@ -10,7 +17,7 @@ class X {
     // 获取锁
     rtl.lock();  
     try {
-      value+=1;
+      value += 1;
     } finally {
       // 保证锁能释放
       rtl.unlock();
@@ -18,17 +25,17 @@ class X {
   }
 }
 ReenTrantLock利用了volatile的可见性原则。　内部有一个volatile的state变量，获取锁时，读写state变量；释放锁是，也会读写state变量。这样：
-１）、前一个线程的unlock()操作一定对于后一个线程的lock()操作是可见的。
-２）、再根据顺序性原则，前一个线程的内的操作对于unlock()这个操作一定是可见的
-３）、再根据传递性原则，前一个线程内的操作对于后一个线程的lock()操作是可见的。
+１）前一个线程的unlock()操作一定对于后一个线程的lock()操作是可见的。
+２）再根据顺序性原则，前一个线程的内的操作对于unlock()这个操作一定是可见的
+３）再根据传递性原则，前一个线程内的操作对于后一个线程的lock()操作是可见的。
 ReenTrantLock还是可重入的（顾名思义），指的是线程可以重复获取同一把锁。
 ReeanTrantLock还有一个带fair参数的构造函数，true则表示是公平锁，否则是非公平锁。
 如果是公平锁，唤醒策略就是，等待的时间越长，谁就先被唤醒；否则，就是notifyAll的机制，大家公平竞争。
+
 ３. 活锁的例子：
 class Account {
   private int balance;
-  private final Lock lock
-          = new ReentrantLock();
+  private final Lock lock = new ReentrantLock();
   // 转账
   void transfer(Account tar, int amt){
     while (true) {
@@ -58,3 +65,32 @@ class Account {
 
 ５. 造成死锁必须满足４个的条件
 互斥，占有且等待，不可抢战，循环等待。
+
+6. synchronized 是 Java 在语言层面提供的互斥原语，其实 Java 里面还有很多其他类型的锁。
+但作为互斥锁，原理都是相通的：锁，一定有一个要锁定的对象，至于这个锁定的对象要保护的资源以及在哪里加锁 / 解锁，
+就属于设计层面的事情了。
+
+7. 以下代码问题在哪里？
+class SafeCalc {
+  long value = 0L;
+  long get() {
+    synchronized (new Object()) {
+      return value;
+    }
+  }
+  void addOne() {
+    synchronized (new Object()) {
+      value += 1;
+    }
+  }
+}
+加锁本质就是在锁对象的对象头中写入当前线程id，但是new object每次在内存中都是新对象，所以加锁无效。
+
+8. tryLock() 仅在调用时锁未被另一个线程保持的情况下，才获取该锁。 
+1）如果该锁没有被另一个线程保持，并且立即返回 true 值，则将锁的保持计数设置为 1。
+即使已将此锁设置为使用公平排序策略，但是调用 tryLock() 仍将 立即获取锁（如果有可用的），
+而不管其他线程当前是否正在等待该锁。在某些情况下，此“闯入”行为可能很有用，即使它会打破公
+平性也如此。如果希望遵守此锁的公平设置，则使用 tryLock(0, TimeUnit.SECONDS) 
+，它几乎是等效的（也检测中断）。 
+2）如果当前线程已经保持此锁，则将保持计数加 1，该方法将返回 true。 
+3）如果锁被另一个线程保持，则此方法将立即返回 false 值。
