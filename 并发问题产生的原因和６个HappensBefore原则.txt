@@ -22,8 +22,10 @@ public class Singleton {
     return instance;
   }
 }
-实际上述单例模式中new语句经过编译器优化后的执行顺序是：a.申请一块内存M->b赋值给instance->c初始化instance。三个步骤各自是原子的，但是abc一起就不是原子的了。多线程时，可能存在线程１只是执行完了b发生了线程切换，但是线程２发现instace已经不为null了，这时直接返回instance，于是线程２在使用instance的成员变量时就可能发生空指针异常。
 
+实际上述单例模式中new语句经过编译器优化后的执行顺序是：a申请一块内存M->b赋值给instance->c初始化instance。
+三个步骤各自是原子的，但是abc一起就不是原子的了。多线程时，可能存在线程１只是执行完了b发生了线程切换，
+但是线程２发现instace已经不为null了，这时直接返回instance，于是线程２在使用instance的成员变量时就可能发生空指针异常。
 
 总之，并发问题产生的原因就是CPU存在缓存，线程存在切换，编译器也会优化语句顺序。
 
@@ -31,7 +33,7 @@ public class Singleton {
 就是说一个线程对共享变量的修改，另一个线程能立刻看到。
 
 ３．volatile的语义
-volatile int x = 0意思是x这个变量不能使用cpu缓存，必须从内存中读写
+volatile int x = 0 的意思是：x这个变量不能使用cpu缓存，必须从内存中读写。
 
 4.　6个HappensBefore原则
 以如下代码为例
@@ -49,9 +51,9 @@ class VolatileExample {
     }
   }
 }
-原则１：x=42 happens before与x=true，即到x=42对于到v=true时是可见的，即程序顺序原则
+原则１：x=42 happens before于x=true，即到x=42对于到v=true时是可见的，即程序顺序原则。
 原则２：volatile变量v的写操作v=true，对于其后续的读操作if (v == true)是可见的。
-原则３：传递性。A对B可见，B对C可见，则A对C可见。比如x=42就对v==true那里可见
+原则３：传递性。A对B可见，B对C可见，则A对C可见。比如x=42就对v==true那里可见。
 
 //【参考２】
 synchronized (this) { // 此处自动加锁
@@ -60,8 +62,14 @@ synchronized (this) { // 此处自动加锁
     this.x = 12; 
   }  
 } // 此处自动解锁
-原则４：锁规则。本次的解锁对下一次的加锁是可见的
+原则４：锁规则。本次的解锁对下一次的加锁是可见的。
+对于线程A，将x修改为12这个操作happens before 线程A释放锁（规则1），
+对于线程B，线程A的释放锁happens before 线程B获得锁（规则4），
+再根据传递性，x被修改为12 happens before 线程B获得锁（规则3），
+由此可见，x被修改为12对于线程B获得锁是可见的，所以线程B获得锁之后可以看到x为12。
 
 原则５：线程启动原则。　A线程中启动B线程，则A中调用B线程的start方法对于B线程的所有操作是可见的。
+换句话说就是，如果线程 A 调用线程 B 的 start() 方法（即在线程 A 中启动线程 B），
+那么该 start() 操作 Happens-Before 于线程 B 中的任意操作。
 
 原则６：线程join规则。B.join()就是要等待线程B执行完后继续执行后面的，所以这个原则是在说B.join()操作对于后续所有操作都是可见的。
