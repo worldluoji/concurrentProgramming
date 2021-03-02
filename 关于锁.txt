@@ -1,9 +1,10 @@
 总之，并发编程的两大核心，１是同步，２是互斥。Java SDK中提供了Lock等手段来解决互斥问题，而使用Condition来解决同步问题。
 加锁能够保证执行临界区代码的互斥性。
 
-１．关于synchronized
-synchronized在申请资源时如果申请不到就直接进入阻塞状态了，进入阻塞状态后线程就什么也不能做，只能等待了。好的锁应该满足a)能够响应中断　b)支持超时　c)非阻塞的获取锁三个条件。所以Java SDK才造了ReenTrantLock
-不过这只是对低版本的JDK来说，高版本已经做了优化，可以放心使用。synchronized，又被称为管程。
+1. 关于synchronized
+synchronized在申请资源时如果申请不到就直接进入阻塞状态了，进入阻塞状态后线程就什么也不能做，只能等待了。
+好的锁应该满足 a)能够响应中断　b)支持超时　c)非阻塞的获取锁三个条件。所以Java SDK才造了ReenTrantLock。
+synchronized又被称为管程。
 
 2. ReentrantLock锁
 ReentrantLock是基于AQS实现的互斥锁，AQS是Java并发包中众多同步组件的构建基础。
@@ -59,12 +60,79 @@ class Account {
 由于ReenTrantLock是非阻塞了，破坏了死锁“不可抢占”的条件，这里不会造成死锁。但是可能出现A和Ｂ互相转账时，各自都持有自己的锁，又去获取对方的锁，造成“活锁”。
 另外要注意的是，ReenTrantLock里面要使用await(),signal(),signalAll()对应synchronized中的wait(),notify(),notifyAll()，不要弄混淆了。
 
-４．死锁和活锁的区别
+4. 造成死锁必须满足４个的条件
+1）互斥，共享资源 X 和 Y 只能被一个线程占用；
+2）占有且等待，线程 T1 已经取得共享资源 X，在等待共享资源 Y 的时候，不释放共享资源 X；
+3）不可抢占，其他线程不能强行抢占线程 T1 占有的资源；
+4）循环等待，线程 T1 等待线程 T2 占有的资源，线程 T2 等待线程 T1 占有的资源，就是循环等待。
+也就是说，只要我们破坏其中一个，就可以成功避免死锁的发生。
+5）死锁的例子：
+class Account {
+  private int balance;
+  // 转账
+  void transfer(Account target, int amt){
+    // 锁定转出账户
+    synchronized(this) {              
+      // 锁定转入账户
+      synchronized(target) {           
+        if (this.balance > amt) {
+          this.balance -= amt;
+          target.balance += amt;
+        }
+      }
+    }
+  } 
+}
+解决上述死锁的方法1——破坏循环等待条件：
+class Account {
+  private int id;
+  private int balance;
+  // 转账
+  void transfer(Account target, int amt){
+    Account left = this        ①
+    Account right = target;    ②
+    if (this.id > target.id) { ③
+      left = target;           ④
+      right = this;            ⑤
+    }                          ⑥
+    // 锁定序号小的账户
+    synchronized(left){
+      // 锁定序号大的账户
+      synchronized(right){ 
+        if (this.balance > amt){
+          this.balance -= amt;
+          target.balance += amt;
+        }
+      }
+    }
+  } 
+}
+这样由于按照排序了，都会先去拿id小的那个锁，再拿id大的那个锁，就不会循环等待，也就不会出现死锁了。
+或者，你可以破坏“占用且等待”：
+void transfer(Account target, int amt){
+  boolean isTransfer = false;
+  // 锁定转出账户
+  synchronized(this){
+      if (this.balance > amt) {
+      this.balance -= amt;
+      isTransfer = true;
+  }
+  if (!isTransfer) {
+      return;
+  }
+  // 锁定转入账户
+  synchronized(target){
+      target.balance += amt;
+  }
+}
+
+反映到现实中的场景：服务员A拿到账本1先判断余额够不够，够的话先扣款，再等待其他人操作完账本2，才增加它的额度。
+但是这样转账和到账就存在一个时差，现实生活中也是这样，转账不会立马到账，短信提醒2小时内到账，所谓的最终一致性。
+实际工作中也有这么做的，只不过是把转入操作放到mq或kafka这样的消息队列里面，消费失败会重试，所以能保证最终一致性。
+
+5．死锁和活锁的区别
 死锁：　A拿着B想要的锁阻塞着，B拿着A想要的锁阻塞着，互不让步。
 活锁：　A非阻塞的拿了锁1想要拿锁２，B非阻塞的拿了锁２想要拿锁１，结果每次AB都拿不全自己想要的锁。
-
-５. 造成死锁必须满足４个的条件
-互斥，占有且等待，不可抢战，循环等待。
 
 6. synchronized 是 Java 在语言层面提供的互斥原语，其实 Java 里面还有很多其他类型的锁。
 但作为互斥锁，原理都是相通的：锁，一定有一个要锁定的对象，至于这个锁定的对象要保护的资源以及在哪里加锁 / 解锁，
@@ -94,3 +162,45 @@ class SafeCalc {
 ，它几乎是等效的（也检测中断）。 
 2）如果当前线程已经保持此锁，则将保持计数加 1，该方法将返回 true。 
 3）如果锁被另一个线程保持，则此方法将立即返回 false 值。
+
+9. 有时候用一把锁有个问题，就是性能太差，会导致取款、查看余额、修改密码、查看密码这四个操作都是串行的。
+而我们用两把锁，取款和修改密码是可以并行的。用不同的锁对受保护资源进行精细化管理，能够提升性能。
+这种锁还有个名字，叫细粒度锁.
+class Account {
+  // 锁：保护账户余额
+  private final Object balLock = new Object();
+  // 账户余额  
+  private Integer balance;
+  // 锁：保护账户密码
+  private final Object pwLock = new Object();
+  // 账户密码
+  private String password;
+
+  // 取款
+  void withdraw(Integer amt) {
+    synchronized(balLock) {
+      if (this.balance > amt){
+        this.balance -= amt;
+      }
+    }
+  } 
+  // 查看余额
+  Integer getBalance() {
+    synchronized(balLock) {
+      return balance;
+    }
+  }
+
+  // 更改密码
+  void updatePassword(String pw){
+    synchronized(pwLock) {
+      this.password = pw;
+    }
+  } 
+  // 查看密码
+  String getPassword() {
+    synchronized(pwLock) {
+      return password;
+    }
+  }
+}
