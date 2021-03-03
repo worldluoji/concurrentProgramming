@@ -1,0 +1,42 @@
+1. 线程的生命周期：new, runnable, block, waiting, time_waiting, terminated
+
+runnable-->block, 仅线程等待synchronized隐式锁
+block-->runnable, 线程获得了synchronized隐式锁
+
+runnable-->waiting, 
+    线程获得了synchronized隐式锁，在临界区类调用wait()，(无时间限制的)等待指定的条件满足。
+    线程调用子线程的Thread.jion(),(无时间限制的)等待子线程执行完成返回。
+    线程调用LockSupport.park(),(无时间限制的)等待LockSupport.unPark(thead)。【LockSupport.park(),用于创建锁和其他同步类的底层基本线程阻塞原语，使当前线程block from thread scheduling】
+waiting-->runnable, 上述3种，条件达成后。
+
+runnable-->time_waiting, 
+    线程获得了synchronized隐式锁，在临界区类调用wait(time)，(有时间限制的)等待指定的条件满足。
+    线程调用子线程的Thread.join(time),(有时间限制的)等待子线程执行完成返回。
+    线程调用LockSupport.parkNanos(Object blocker, long deadline).
+    线程调用LockSupport.partUntil(long deadline).
+    线程调用Thread.sleep(long millis).
+time_waiting-->runnable, 上述条件满足 或 等待超时
+
+runnable-->teminated, 线程自动终结：1,线程run方法执行结束退出; 2,线程run方法内部抛出异常退出
+其他线程通过调用本线程的Tread.interrupt()方法，尝试强制中止本线程：【注：不要用Tread.stop()这个废弃方法，危害...】
+1) 本线程处于waiting,timed_waiting状态时，其他线程调用本线程的interrupt(),会使本线程转为Runnable状态，同时本线程抛出InterruptedException.
+2) 本线程处于Runnable状态，且阻塞在java.nio.channels.InterruptedChannel [可中断channel]时，其他线程调用本线程的interrupt(),会使本线程抛出ClosedByInterruptedException。
+3) 本线程处于Runnable状态，且阻塞在java.nio.channels.Selector[可多路复用的异步IO机制]上时,本线程会（从Selector.select()）立即返回。
+4) 本线程处于Runnable状态，且没有阻塞在某个I/O操作上时，其他线程调用本线程的interrupt(),这只是将本线程的中断标志位置为True。
+本线程可以通过调用isInterrupted()来查看本线程的中断标志位是否被置为true，可以决定退出，也可以忽略它(全看代码逻辑)。
+
+2. 重要：本线程抛出InterruptedException后，会把本线程的中断标志位清空，可能已有的中断标志True就消失了，可能会引起本线程失去主动监测中断标志以退出的机会！
+所以，对本线程抛出的InterruptedException的异常try-catch后，再主动置标志位为True。Thead.currentTread().interrupt();
+所以以下代码可能会造成死循环：
+Thread th = Thread.currentThread();
+while(true) {
+  if(th.isInterrupted()) {
+    break;
+  }
+  // 省略业务代码无数
+  try {
+    Thread.sleep(100);
+  }catch (InterruptedException e){
+    e.printStackTrace();
+  }
+}
