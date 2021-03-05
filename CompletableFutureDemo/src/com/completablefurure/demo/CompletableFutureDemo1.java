@@ -1,9 +1,7 @@
 package com.completablefurure.demo;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 public class CompletableFutureDemo1 {
 	public static void sleep(int t, TimeUnit u) {
