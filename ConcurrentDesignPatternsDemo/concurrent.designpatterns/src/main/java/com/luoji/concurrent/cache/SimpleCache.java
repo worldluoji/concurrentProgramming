@@ -5,6 +5,12 @@ import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/*
+* ReadWriteLock 支持两种模式：一种是读锁，一种是写锁
+* 所有的读写锁都遵守以下三条基本原则：允许多个线程同时读共享变量；
+* 只允许一个线程写共享变量；如果一个写线程正在执行写操作，此时禁止读线程读共享变量。
+* 总之，只允许同时读。
+*/
 class Cache<K, V> {
     private final Map<K,V> m = new HashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
