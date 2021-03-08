@@ -20,5 +20,6 @@ public class ThreadPoolExecutorDemo1 {
 				}
 			});
 		}
+		newFixedThreadPool.shutdown();
 	}
 }

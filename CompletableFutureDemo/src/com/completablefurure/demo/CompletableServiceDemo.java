@@ -20,6 +20,9 @@ import java.util.concurrent.Future;
 ** ExecutorCompletionService(Executor executor, BlockingQueue<Future<V>> completionQueue)。
 ** 这两个构造方法都需要传入一个线程池，如果不指定 completionQueue，那么默认会使用无界的 LinkedBlockingQueue。
 ** 任务执行结果的 Future 对象就是加入到 completionQueue 中。
+** 对于简单的并行任务，你可以通过“线程池 + Future”的方案来解决；
+** 如果任务之间有聚合关系，无论是 AND 聚合还是 OR 聚合，都可以通过 CompletableFuture 来解决；
+** 而批量的并行任务，则可以通过 CompletionService 来解决。
 */
 public class CompletableServiceDemo {
     public static void main(String[] args) throws InterruptedException, ExecutionException {
@@ -41,5 +44,6 @@ public class CompletableServiceDemo {
                 System.out.println(r + " finished");
             });
         }
+        es.shutdown();
     }
 }
