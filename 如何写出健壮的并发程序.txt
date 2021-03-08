@@ -29,3 +29,35 @@ JDK的并发包里，有很多特定场景针对并发性能的设计。例如�
 还可以使用读写锁，也就是读是无锁的，只有写的时候才会互斥。
 还有很多无锁化的设计，例如线程本地存储 (Thread Local Storage, TLS)、写入时复制 (Copy-on-write)、乐观锁等；
 Java 并发包里面的原子类也是一种无锁的数据结构；Disruptor 则是一个无锁的内存队列，性能都非常好……
+
+5. 组合操作往往隐藏着竞态条件问题，即便每个操作都能保证原子性，也并不能保证组合操作的原子性，这个一定要注意。
+比如下面通过迭代器遍历的代码：
+List list = Collections.synchronizedList(new ArrayList());
+Iterator i = list.iterator(); 
+while (i.hasNext())
+  foo(i.next());
+就存在并发问题。
+而正确的做法应该是：
+List list = Collections.synchronizedList(new ArrayList());
+synchronized (list) {  
+  Iterator i = list.iterator(); 
+  while (i.hasNext())
+    foo(i.next());
+}
+Java 提供的同步容器还有 Vector、Stack 和 Hashtable，这三个容器不是基于包装类实现的，
+但同样是基于 synchronized 实现的，对这三个容器的遍历，同样要加锁保证互斥。
+
+6. CopyOnWriteArrayList 仅适用于写操作非常少的场景，而且能够容忍读写的短暂不一致。
+另一个需要注意的是，CopyOnWriteArrayList 迭代器是只读的，不支持增删改。
+
+7. Map 接口的两个实现是 ConcurrentHashMap 和 ConcurrentSkipListMap
+1） 主要区别在于 ConcurrentHashMap 的 key 是无序的，而 ConcurrentSkipListMap 的 key 是有序的。
+2） 使用 ConcurrentHashMap 和 ConcurrentSkipListMap 需要注意的地方是，它们的 key 和 value 都不能为空，
+否则会抛出NullPointerException这个运行时异常。
+3）如果key冲突比较大，hashmap还是要靠链表或者tree来解决冲突的，所以O(1)是理想值。
+同时增删改操作很多也影响hashmap性能。这个也是要看冲突情况。也就是说hashmap的稳定性差，
+如果很不幸正好偶遇它的稳定性问题，同时又接受不了，就可以尝试skiplistmap，
+它能保证稳定性，无论你的并发量是多大，也没有key冲突的问题。
+
+8. Queue中， 只有 ArrayBlockingQueue 和 LinkedBlockingQueue 是支持有界的，所以在使用其他无界队列时，
+一定要充分考虑是否存在导致 OOM 的隐患。
