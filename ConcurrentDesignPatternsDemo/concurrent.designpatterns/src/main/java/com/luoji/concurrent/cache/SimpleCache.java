@@ -44,9 +44,8 @@ class Cache<K, V> {
             v = m.get(key);
             //其他线程可能已经查询过数据库, 所以再次验证
             if (v == null) {
-                // 模拟查询数据库获取数据
-                v = (V)"test";
-                m.put(key, v);
+                // 模拟查询数据库获取数据,放到map中。
+                m.put(key, null);
             }
         } finally {
             writeLock.unlock();

@@ -4,6 +4,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+/**
+** 场景：现在有三个任务T1,T2,T3
+** T1和T2步调要一致，T1,T2都完成后T3才能执行
+**/
 public class CountDownLatchDemo {
 
     // 模拟耗时任务1
