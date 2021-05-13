@@ -72,4 +72,7 @@ CountDownLatch 和 CyclicBarrier 是 Java 并发包提供的两个非常易用�
 除此之外 CountDownLatch 的计数器是不能循环利用的，也就是说一旦计数器减到 0，再有线程调用 await()，该线程会直接通过。
 但 CyclicBarrier 的计数器是可以循环利用的，而且具备自动重置的功能，一旦计数器减到 0 会自动重置到你设置的初始值。
 除此之外，CyclicBarrier 还可以设置回调函数，可以说是功能丰富。
+
+调用await方法的线程告诉CyclicBarrier自己已经到达同步点，然后当前线程被阻塞。
+直到parties个参与线程调用了await方法，CyclicBarrier同样提供带超时时间的await和不带超时时间的await方法
 **/
