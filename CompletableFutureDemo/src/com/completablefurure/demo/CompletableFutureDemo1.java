@@ -31,7 +31,7 @@ public class CompletableFutureDemo1 {
 		    return "绿茶";
 		});
 		
-		// f3要等任务1和任务2结束后再执行，而f1和f2之间时并行的
+		// f3要等任务1和任务2结束后再执行，而f1和f2之间时并行的， (__, tf)分别表示f1和f2的返回值，由于f1无返回值，用__代替
 		CompletableFuture<String> f3 = f1.thenCombine(f2, (__, tf)->{
 			System.out.println("T1 拿到茶叶...");
 			System.out.println("T1 泡茶...");
