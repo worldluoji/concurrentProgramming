@@ -1,0 +1,12 @@
+Java通过Executors提供四种线程池，分别为：
+（1）newCachedThreadPool创建一个可缓存线程池，如果线程池长度超过处理需要，可灵活回收空闲线程，若无可回收，则新建线程。 线程池为无限大，当执行第二个任务时第一个任务已经完成，会复用执行第一个任务的线程，而不用每次新建线程。 可能导致内存溢出,一般使用newFixedThreadPool代替 
+（2）newFixedThreadPool 创建一个定长线程池，可控制线程最大并发数，超出的线程会在队列中等待。
+（3）newScheduledThreadPool 创建一个定长线程池，支持定时及周期性任务执行。
+（4）newSingleThreadExecutor 创建一个单线程化的线程池，它只会用唯一的工作线程来执行任务，保证所有任务按照指定顺序(FIFO, LIFO, 优先级)执行。
+
+（5） newSingleThreadScheduledExecutor 
+创建只有一条线程的线程池，他可以在指定延迟后执行线程任务 
+
+（6）newWorkStealingPool（这个是在jdk1.8出来的）会更加所需的并行层次来动态创建和关闭线程。它同样会试图减少任务队列的大小，所以比较适于高负载的环境。同样也比较适用于当执行的任务会创建更多任务，如递归任务。适合使用在很耗时的操作，但是newWorkStealingPool不是ThreadPoolExecutor的扩展，它是新的线程池类ForkJoinPool的扩展，但是都是在统一的一个Executors类中实现，由于能够合理的使用CPU进行对任务操作（并行操作），所以适合使用在很耗时的任务中
+
+
